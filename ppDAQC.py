@@ -33,7 +33,7 @@ def help():
 	print ("Digital Input Functions:")
 	print ("	getDINbit(addr,bit) - return bit value")
 	print ("	getDINall(addr) - return all eight bits")
-	print ("	enableDINint(addr, bit, type)")
+	print ("	enableDINint(addr, bit, type) - ")
 	print ("	disableDINint(addr,bit)")	
 	print
 	print ("Digital Output Functions:")	
@@ -51,32 +51,42 @@ def help():
 	print ("Bicolor LED control functions:")
 	print ("	setLED(addr,color)")
 	print ("	clrLED(addr,color)")
-	print ("getSW(addr)")
-	print ("getID(addr) - return descriptor string")
-	print ("getFWrev(addr) - return FW revision in byte format")
-	print ("getHWrev(addr) - return HW revision in byte format")
-	print ("getADDR(addr) - return address of pi-plate. Used for polling available boards at")
-	print (" power up")
-
-	print ("getINTflags(addr, int) - returns then clears all INT flags ")
-	print ("enableSWpower(addr) - pushing button on ppGPIO will short RPI GPIO pin X to") 
-	print (" GND and then remove 5VDC 45 seconds later. Note that this setting is saved in")
-	print (" nonvolatile memory and only has to be performed once")
-	print ("disableSWpower(addr) - disables the above. Note that")
-	print (" this setting is stored in nonvolatile memory and only")
-	print (" has to be performed once.")
+	print
+	print ("System Level Functions:")	
+	print ("	getID(addr) - return descriptor string")
+	print ("	getFWrev(addr) - return FW revision in byte format")
+	print ("	getHWrev(addr) - return HW revision in byte format")
+	print ("	getADDR(addr) - return address of pi-plate. Used for polling available boards")
+	print ("  	  at power up.")
+	print
+	print ("Switch Functions:")
+	print ("	getSWstate(addr) - returns current state of on board switch. A value of 1 is")
+	print ("	  returned when the switch is up and a value of 0 is returned when it's down.")
+	print ("	enableSWpower(addr) - pushing button on ppGPIO will short RPI GPIO pin X to") 
+	print ("  	  GND and then remove 5VDC 45 seconds later. Note that this setting is saved")
+	print ("  	  in nonvolatile memory and only has to be performed once")
+	print ("	disableSWpower(addr) - disables the above. Note that this setting is stored")
+	print ("   	  in nonvolatile memory and only has to be performed once.")
+	print ("	enableSWint(addr) - allows the switch to generate an interrupts when pressed.")
+	print ("	  Global interrupts must be enabled before using this function.")
+	print ("	disableSWint(addr) - blocks switch on board from generating an interrupt.")
+	
 	print 
+	print ("getINTflags(addr, int) - returns then clears all INT flags ")
+	print
 	print ("Definitions:")
-	print ("*Address (addr): ppDAQC boards have jumpers on the board that allow")
-	print (" the address to be set to a value between 0 and 7.")
-	print ("*ADC (analog to digital converter) channels can be 0 through 8 for a ")
-	print (" total of 9 channels. Reading channel 8 will return Vcc voltage.")
-	print ("*DIN (digital input) channels can be 0 through 7 for a total of 8 channels")
-	print ("*DOUT (digital output) channels can be 0 through 6 for a total of 7 channels")
-	print ("*PWM (pulse width modulator) channels can be 0 or 1 for a total of 2 channels")
-	print (" The output values can be between 0 and 1023")
-	print ("*DAC (digital to analog converter) channels can be 0 or 1 for a total of")
-	print (" 2 channels. The output value can be between 0 and 4.096 volts")
+	print ("    Address (addr): ppDAQC boards have jumpers on the board that allow")
+	print ("      their address to be set to a value between 0 and 7.")
+	print ("    ADC (analog to digital converter) channels can be 0 through 8 for a ")
+	print ("      total of 9 channels. Reading channel 8 will return the power supply")
+	print ("      voltage.")
+	print ("    DIN (digital input) channels can be 0 through 7 for a total of 8 channels")
+	print ("    DOUT (digital output) channels can be 0 through 6 for a total of 7 channels")
+	print ("    PWM (pulse width modulator) channels can be 0 or 1 for a total of 2")
+	print ("       channels. The output values can be between 0 and 1023.")
+	print ("      ")
+	print ("    DAC (digital to analog converter) channels can be 0 or 1 for a total of")
+	print ("      2 channels. The output value can be between 0 and 4.096 volts")
 #===============================================================================#	
 # ADC Functions	     	                                              			#
 #===============================================================================#	
@@ -169,7 +179,7 @@ def getLED(addr,led):
 #==============================================================================#	
 # Switch Functions	                                                   #
 #==============================================================================#		
-def getSW(addr):
+def getSWstate(addr):
 	if (addr>MAXADDR):
 		return "ERROR: address out of range - must be less than", MAXADDR-1
 	resp=ppCMD(addr,0x50,0,0,1)
