@@ -1,6 +1,7 @@
 import spidev
 import time
 import string
+import site
 import RPi.GPIO as GPIO
 GPIO.setwarnings(False)
 
@@ -13,6 +14,9 @@ GPIO.setup(ppFRAME,GPIO.OUT)
 GPIO.setup(ppINT, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 spi = spidev.SpiDev()
 spi.open(0,1)	
+localPath=site.getsitepackages()[0]
+helpPath=localPath+'/piplates/ppDAQChelp.txt'
+
 
 MAXADDR=8
 	
@@ -27,66 +31,25 @@ def HELP():
 	help()	
 	
 def help():
-	print ("Analog Input Functions:")
-	print ("	getADC(addr, channel) - return voltage")
-	print
-	print ("Digital Input Functions:")
-	print ("	getDINbit(addr,bit) - return bit value")
-	print ("	getDINall(addr) - return all eight bits")
-	print ("	enableDINint(addr, bit, type) - ")
-	print ("	disableDINint(addr,bit)")	
-	print
-	print ("Digital Output Functions:")	
-	print ("	setDOUTbit(addr, bit) - set single bit")
-	print ("	clrDOUTbit(addr, bit) - clear single bit")
-	print ("	toggleDOUTbit(addr, bit) - toggle a single bit")	
-	print ("	setDOUTall(addr,byte) - set all the bits a once")
-	print
-	print ("Digital to Analog Converter & Pulse Width Modulator Functions:")	
-	print ("	setPWM(addr,channel,value)")
-	print ("	getPWM(addr,channel)")	
-	print ("	setDAC(addr,channel,value)")
-	print ("	getDAC(addr,channel)")		
-	print
-	print ("Bicolor LED control functions:")
-	print ("	setLED(addr,color)")
-	print ("	clrLED(addr,color)")
-	print
-	print ("System Level Functions:")	
-	print ("	getID(addr) - return descriptor string")
-	print ("	getFWrev(addr) - return FW revision in byte format")
-	print ("	getHWrev(addr) - return HW revision in byte format")
-	print ("	getADDR(addr) - return address of pi-plate. Used for polling available boards")
-	print ("  	  at power up.")
-	print
-	print ("Switch Functions:")
-	print ("	getSWstate(addr) - returns current state of on board switch. A value of 1 is")
-	print ("	  returned when the switch is up and a value of 0 is returned when it's down.")
-	print ("	enableSWpower(addr) - pushing button on ppGPIO will short RPI GPIO pin X to") 
-	print ("  	  GND and then remove 5VDC 45 seconds later. Note that this setting is saved")
-	print ("  	  in nonvolatile memory and only has to be performed once")
-	print ("	disableSWpower(addr) - disables the above. Note that this setting is stored")
-	print ("   	  in nonvolatile memory and only has to be performed once.")
-	print ("	enableSWint(addr) - allows the switch to generate an interrupts when pressed.")
-	print ("	  Global interrupts must be enabled before using this function.")
-	print ("	disableSWint(addr) - blocks switch on board from generating an interrupt.")
-	
-	print 
-	print ("getINTflags(addr, int) - returns then clears all INT flags ")
-	print
-	print ("Definitions:")
-	print ("    Address (addr): ppDAQC boards have jumpers on the board that allow")
-	print ("      their address to be set to a value between 0 and 7.")
-	print ("    ADC (analog to digital converter) channels can be 0 through 8 for a ")
-	print ("      total of 9 channels. Reading channel 8 will return the power supply")
-	print ("      voltage.")
-	print ("    DIN (digital input) channels can be 0 through 7 for a total of 8 channels")
-	print ("    DOUT (digital output) channels can be 0 through 6 for a total of 7 channels")
-	print ("    PWM (pulse width modulator) channels can be 0 or 1 for a total of 2")
-	print ("       channels. The output values can be between 0 and 1023.")
-	print ("      ")
-	print ("    DAC (digital to analog converter) channels can be 0 or 1 for a total of")
-	print ("      2 channels. The output value can be between 0 and 4.096 volts")
+    valid=True
+    try:    
+        f=open(helpPath,'r')
+        while(valid):
+            Count=0
+            while (Count<20):
+                s=f.readline()
+                if (len(s)!=0):
+                    print s[:len(s)-1]
+                    Count = Count + 1
+                    if (Count==20):
+                        Input=raw_input('press \"Enter\" for more...')                        
+                else:
+                    Count=100
+                    valid=False
+        f.close()
+    except IOError:
+        print ("Can't open help file. Did you copy it to the same folder as ppDAQC.py?")
+   
 #===============================================================================#	
 # ADC Functions	     	                                              			#
 #===============================================================================#	
@@ -104,6 +67,16 @@ def getADC(addr,channel):
 		value=value*2.0
 	return value
 
+def getADCall(addr):
+    value=range(8)
+    if (addr>MAXADDR):
+        return "ERROR: address out of range - must be less than", MAXADDR-1
+    resp=ppCMD(addr,0x31,0,0,16)
+    for i in range (0,8):
+        value[i]=(256*resp[2*i]+resp[2*i+1])
+        value[i]=round(value[i]*4.096/1024,3)
+    return value    
+    
 #===============================================================================#	
 # Digital Input Functions	                                                   	#
 #===============================================================================#
@@ -143,6 +116,29 @@ def disableDINint(addr,bit):	# disable DIN interrupt
 		return "ERROR: bit argument out of range"
 	resp=ppCMD(addr,0x24,bit,0,0)
 	
+def getTEMP(addr,channel,scale):
+    if (addr>MAXADDR):
+        return "ERROR: address out of range - must be less than", MAXADDR-1
+    if (channel>7):
+        return "ERROR: channel value out of range"
+    scal=scale.lower()
+    if ((scal!='c') and (scal!='f') and (scal!='k')):
+        return "ERROR: incorrect scale parameter"
+    resp=ppCMD(addr,0x70,channel,0,0)   #initiate measurement
+    time.sleep(1)
+    resp=ppCMD(addr,0x71,channel,0,2)   #get data
+    Temp=resp[0]*256+resp[1]
+    if (Temp>0x8000):
+        Temp = Temp^0xFFFF
+        Temp = -(Temp+1)
+    Temp = round((Temp/16.0),4)
+    if (scal=='k'):
+        Temp = Temp + 273
+    if (scal=='f'):
+        Temp = round((Temp*1.8+32.2),4)
+    return Temp
+        
+    
 #===============================================================================#	
 # LED Functions	                                                   		   		#
 #===============================================================================#			
@@ -203,7 +199,7 @@ def enableSWpower(addr):
 def disableSWpower(addr):
 	if (addr>MAXADDR):
 		return "ERROR: address out of range - must be less than", MAXADDR-1
-		resp=ppCMD(addr,0x54,0,0,0)
+	resp=ppCMD(addr,0x54,0,0,0)
 		
 		
 #==============================================================================#	
@@ -294,7 +290,16 @@ def getDAC(addr,channel):
 	value=(256*resp[0]+resp[1])
 	return resp
 
-
+def calDAC(addr):
+    global Vcc
+    if (addr>MAXADDR):
+        return "ERROR: address out of range - must be less than", MAXADDR-1    
+    rtn = getADDR(addr)
+    if ((rtn-8)==addr):
+        Vcc[addr] = getADC(addr,8)
+    else:
+        Vcc[i]=10000        
+        
 #==============================================================================#	
 # Interrupt Control Functions	                                               #
 #==============================================================================#	
@@ -371,31 +376,41 @@ def getID(addr):
 	GPIO.output(ppFRAME,False)
 	return id	
 	
-def getPROGdata(addr,paddr):	#read INT flag registers in ppDAQC
+def getPROGdata(addr,paddr):	#read a byte of data from program memory
 	if (addr>MAXADDR):
 		return "ERROR: address out of range - must be less than", MAXADDR-1
 	resp=ppCMD(addr,0xF0,paddr>>8,paddr&0xFF,2)
 	value=(256*resp[0]+resp[1])
 	return hex(value)	
+
+def Poll():
+    ppFoundCount=0
+    for i in range (0,8):
+        rtn = getADDR(i)
+        if ((rtn-8)==i):
+            print "ppDAQC board found at address",rtn-8
+            ppFoundCount += 1
+    if (ppFoundCount == 0):
+        print "No ppDAQC boards found"
+
 	
 def ppCMD(addr,cmd,param1,param2,bytes2return):
-	global GPIObaseADDR
-	arg = range(4)
-	resp = []
-	arg[0]=addr+GPIObaseADDR;
-	arg[1]=cmd;
-	arg[2]=param1;
-	arg[3]=param2;
-	#print arg
-	GPIO.output(ppFRAME,True)
-	null = spi.writebytes(arg)
-	if bytes2return>0:
-		time.sleep(.0001)
-		for i in range(0,bytes2return):	
-			dummy=spi.readbytes(1)
-			resp.append(dummy[0])
-	GPIO.output(ppFRAME,False)
-	return resp	
+    global GPIObaseADDR
+    arg = range(4)
+    resp = []
+    arg[0]=addr+GPIObaseADDR;
+    arg[1]=cmd;
+    arg[2]=param1;
+    arg[3]=param2;
+    GPIO.output(ppFRAME,True)
+    null = spi.writebytes(arg)
+    if bytes2return>0:
+        time.sleep(.0001)
+        for i in range(0,bytes2return):	
+            dummy=spi.readbytes(1)
+            resp.append(dummy[0])
+    GPIO.output(ppFRAME,False)
+    return resp	
 	
 
 	
@@ -412,8 +427,8 @@ for i in range (0,8):
 		ppFoundCount += 1
 	else:
 		Vcc[i]=10000
-
-print ppFoundCount,"ppDAQC boards found"
+if (ppFoundCount==0):
+    print "No ppDAQC boards found!"
 
 # GPIO Commands
 # Common:
